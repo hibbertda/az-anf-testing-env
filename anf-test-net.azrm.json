@@ -1,0 +1,187 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "env": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            },
+            "defaultValue": "anftest"
+        },
+        "vnet": {
+            "type": "object",
+            "metadata": {
+                "description": "description"
+            },
+            "defaultValue": {
+                "ipv4Prefix": "10.200.0.0/16"
+            }
+        }
+    },
+    "functions": [],
+    "variables": {
+        "nsgName": "[concat('nsg-', parameters('env'))]",
+        "subnets": [
+            {
+                "name": "vm",
+                "ipv4prefix": "10.200.1.0/24"
+            },
+            {
+                "name": "anf",
+                "ipv4Prefix": "10.200.200.0/27"
+            }
+        ],
+        "vnetName": "[concat('vnet-', parameters('env'),'-',resourceGroup().location)]",
+        "anf": {
+            "account": {
+                "name": "[concat('anf-act-', parameters('env'), '-', resourceGroup().location)]"
+            },
+            "capPool": [
+                {
+                    "name": "premium",
+                    "size": 10995116277760,
+                    "serviceLevel": "Premium",
+                    "volumes": {}
+                },
+                {
+                    "name": "standard",
+                    "size": 4398046511104,
+                    "serviceLevel": "Standard",
+                    "volumes": {}
+                }
+            ]
+        }
+    },
+    "resources": [
+        {
+            "name": "[concat(variables('nsgName'),'-',variables('subnets')[copyIndex('nsgcopy')].name)]",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "nsgcopy",
+                "count": "[length(variables('subnets'))]"
+            },
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "nsgRule1",
+                        "properties": {
+                            "description": "description",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[variables('vnetName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[variables('vnetName')]"
+            },
+            "dependsOn": ["nsgcopy"],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('vnet').ipv4Prefix]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[concat('sn-', variables('vnetName'), '-vm-', resourceGroup().location)]",
+                        "properties": {
+                            "addressPrefix": "10.200.1.0/24"
+                        }
+                    },
+                    {
+                        "name": "[concat('sn-', variables('vnetName'), '-anf-', resourceGroup().location)]",
+                        "properties": {
+                            "addressPrefix": "10.200.200.0/27",
+                            "delegations": [
+                                {
+                                    "name": "anf",
+                                    "properties": {
+                                        "serviceName": "Microsoft.Netapp/volumes"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[variables('anf').account.name]",
+            "type": "Microsoft.NetApp/netAppAccounts",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "properties": {},
+            "dependsOn": [
+                
+            ]
+        },
+        {
+            "name": "[concat(variables('anf').account.name, '/', variables('anf').capPool[copyIndex()].name)]",
+            "type": "Microsoft.NetApp/netAppAccounts/capacityPools",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "anfCapPool",
+                "count": "[length(variables('anf').capPool)]"
+            },
+            "properties": {
+                "serviceLevel": "[variables('anf').capPool[copyIndex()].serviceLevel]",
+                "size": "[variables('anf').capPool[copyIndex()].size]"
+            }
+        },
+        {
+            "name": "[concat(variables('anf').account.name, '/', variables('anf').capPool[copyIndex()].name, '/vol', copyIndex())]",
+            "type": "Microsoft.NetApp/netAppAccounts/capacityPools/volumes",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.NetApp/netAppAccounts', variables('anf').account.name)]",
+                "anfCapPool"
+            ],
+            "copy": {
+                "name": "volLoop",
+                "count": "[length(variables('anf').capPool)]"
+            },
+            "properties": {
+                "mountTargets": [],
+                "creationToken": "[concat(variables('anf').capPool[copyIndex()].name, '-',copyIndex())]",
+                "usageThreshold": 107374182400,
+                "subnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName') ,concat(variables('vnetName'), '-anf-', resourceGroup().location))]",
+                "exportPolicy": {
+                    "rules": [
+                        {
+                            "ruleIndex": 1,
+                            "unixReadOnly": false,
+                            "unixReadWrite": true,
+                            "cifs": false,
+                            "nfsv3": true,
+                            "nfsv41": false,
+                            "allowedClients": "[parameters('vnet').ipv4Prefix]"
+                        }
+                    ]
+                },
+                "protocolTypes": [
+                    "NFSv3"
+                ]
+            }
+
+        }        
+    ],
+    "outputs": {}
+}
