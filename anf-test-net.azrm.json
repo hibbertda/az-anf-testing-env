@@ -37,7 +37,7 @@
             "metadata": {
                 "description": "username for vm admin account"
             },
-            "defaultValue": "hbladmin"
+            "defaultValue": "afntestadmin"
         },
         "vmAdminPassword": {
             "type": "securestring",
@@ -91,14 +91,9 @@
         "installscripts": [
             {
                 "name": "install-diskPerfTools",
-                "uri": "https://raw.githubusercontent.com/hibbertda/azure-examples/master/Templates/002-AppDeployment/002-4_vm-anf/install-diskperftools.sh",
+                "uri": "https://raw.githubusercontent.com/hibbertda/az-anf-testing-env/master/scripts/install-diskperftools.sh",
                 "script": "install-diskperftools.sh"
-            },
-            {
-                "name": "mount-anf",
-                "uri": "https://raw.githubusercontent.com/hibbertda/azure-examples/master/Templates/002-AppDeployment/002-4_vm-anf/install-diskperftools.sh",
-                "script": "attach-nafVolume.sh"
-            }            
+            }         
         ]        
     },
     "resources": [
@@ -116,7 +111,7 @@
             "properties": {
                 "publicIPAllocationMethod": "Static",
                 "dnsSettings": {
-                    "domainNameLabel": "anfperftestbas0908"
+                    "domainNameLabel": "[concat('anfperftestbas0908',resourceGroup().name)]"
                 }
             }
         },
@@ -194,7 +189,7 @@
             }
         },
         {
-            "name": "[concat('bas-', parameters('env'))]",
+            "name": "[variables('basName')]",
             "type": "Microsoft.Network/bastionHosts",
             "apiVersion": "2020-05-01",
             "location": "[resourceGroup().location]",
@@ -377,7 +372,8 @@
                 "displayName": "[variables('installscripts')[copyIndex()].name]"
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Compute/virtualMachines', concat(variables('vmHostname'), '-001'))]"
+                "[resourceId('Microsoft.Compute/virtualMachines', concat(variables('vmHostname'), '-001'))]",
+                "volLoop"
             ],
             "copy": {
                 "name": "customScriptLoop",
@@ -397,5 +393,10 @@
             }
         }        
     ],
-    "outputs": {}
+    "outputs": {
+        "vm-ipaddress": {
+            "type": "string",
+            "value": "[reference(concat('nic-', variables('vmHostname'), '-nic0')).ipConfigurations[0].properties.privateIPAddress]"
+        }
+    }
 }
