@@ -17,11 +17,41 @@
             "defaultValue": {
                 "ipv4Prefix": "10.200.0.0/16"
             }
-        }
+        },
+        "compute": {
+            "type": "object",
+            "metadata": {
+                "description": "VM configuration"
+            },
+            "defaultValue": {
+                "instanceCount": "",
+                "vmSku": "Standard_E64s_v3",
+                "osDiskType": "Standard_LRS",
+                "osImagePublisher": "Canonical",
+                "osImageOffer": "UbuntuServer",
+                "osImageSku": "16.04-LTS"
+            }
+        },
+        "vmAdminUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "username for vm admin account"
+            },
+            "defaultValue": "hbladmin"
+        },
+        "vmAdminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "password for vm admin account"
+            }
+        }                
     },
     "functions": [],
     "variables": {
         "nsgName": "[concat('nsg-', parameters('env'))]",
+        "pipName": "[concat('pip-', parameters('env'))]",
+        "basName": "[concat('bas-', parameters('env'))]",
+        "vmHostname": "[concat('vm-hbl-', parameters('env'), '-',parameters('compute').osImageOffer ,'-',parameters('env'))]",
         "subnets": [
             {
                 "name": "vm",
@@ -40,20 +70,56 @@
             "capPool": [
                 {
                     "name": "premium",
-                    "size": 10995116277760,
+                    "size": 4398046511104,
                     "serviceLevel": "Premium",
-                    "volumes": {}
+                    "mountTarget": {
+                        "uuid": "8010ab91-baf6-4d96-a481-f3c846a9c941",
+                        "name": "premium"
+                    }
                 },
                 {
                     "name": "standard",
                     "size": 4398046511104,
                     "serviceLevel": "Standard",
-                    "volumes": {}
+                    "mountTarget": {
+                        "uuid": "1f0e5f5b-1c65-438a-8823-c79d9e1318df",
+                        "name": "standard"
+                    }
                 }
             ]
-        }
+        },
+        "installscripts": [
+            {
+                "name": "install-diskPerfTools",
+                "uri": "https://raw.githubusercontent.com/hibbertda/azure-examples/master/Templates/002-AppDeployment/002-4_vm-anf/install-diskperftools.sh",
+                "script": "install-diskperftools.sh"
+            },
+            {
+                "name": "mount-anf",
+                "uri": "https://raw.githubusercontent.com/hibbertda/azure-examples/master/Templates/002-AppDeployment/002-4_vm-anf/install-diskperftools.sh",
+                "script": "attach-nafVolume.sh"
+            }            
+        ]        
     },
     "resources": [
+        {
+            "name": "[variables('pipName')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[variables('pipName')]"
+            },
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                    "domainNameLabel": "anfperftestbas0908"
+                }
+            }
+        },
         {
             "name": "[concat(variables('nsgName'),'-',variables('subnets')[copyIndex('nsgcopy')].name)]",
             "type": "Microsoft.Network/networkSecurityGroups",
@@ -117,10 +183,42 @@
                                 }
                             ]
                         }
+                    },
+                    {
+                        "name": "AzureBastionSubnet",
+                        "properties": {
+                            "addressPrefix": "10.200.230.0/27"
+                        }
                     }
                 ]
             }
         },
+        {
+            "name": "[concat('bas-', parameters('env'))]",
+            "type": "Microsoft.Network/bastionHosts",
+            "apiVersion": "2020-05-01",
+            "location": "[resourceGroup().location]",
+            "tags": {},
+            "dependsOn": [
+                "[variables('vnetName')]",
+                "[variables('pipName')]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "IpConf",                        
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), 'AzureBastionSubnet')]"
+                            },
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('pipName'))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },     
         {
             "name": "[variables('anf').account.name]",
             "type": "Microsoft.NetApp/netAppAccounts",
@@ -140,13 +238,16 @@
                 "name": "anfCapPool",
                 "count": "[length(variables('anf').capPool)]"
             },
+            "dependsOn": [
+                "[resourceId('Microsoft.NetApp/netAppAccounts', variables('anf').account.name)]"
+            ],
             "properties": {
                 "serviceLevel": "[variables('anf').capPool[copyIndex()].serviceLevel]",
                 "size": "[variables('anf').capPool[copyIndex()].size]"
             }
         },
         {
-            "name": "[concat(variables('anf').account.name, '/', variables('anf').capPool[copyIndex()].name, '/vol', copyIndex())]",
+            "name": "[concat(variables('anf').account.name, '/', variables('anf').capPool[copyIndex()].name, '/', variables('anf').capPool[copyIndex()].mountTarget.name)]",
             "type": "Microsoft.NetApp/netAppAccounts/capacityPools/volumes",
             "apiVersion": "2019-11-01",
             "location": "[resourceGroup().location]",
@@ -159,10 +260,14 @@
                 "count": "[length(variables('anf').capPool)]"
             },
             "properties": {
-                "mountTargets": [],
-                "creationToken": "[concat(variables('anf').capPool[copyIndex()].name, '-',copyIndex())]",
+                "mountTargets": [
+                    {
+                        "fileSystemId": "[guid(concat(variables('anf').account.name, '/', variables('anf').capPool[copyIndex()].mountTarget.name))]"
+                    }
+                ],
+                "creationToken": "[concat('vol', copyIndex())]",
                 "usageThreshold": 107374182400,
-                "subnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName') ,concat(variables('vnetName'), '-anf-', resourceGroup().location))]",
+                "subnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), concat('sn-', variables('vnetName'), '-anf-', resourceGroup().location))]",
                 "exportPolicy": {
                     "rules": [
                         {
@@ -181,6 +286,115 @@
                 ]
             }
 
+        },
+        {
+            "name": "[concat('nic-', variables('vmHostname'), '-nic0')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[concat('nic-', variables('vmHostname'), '-nic0')]"
+            },
+            "dependsOn": [
+                "[variables('vnetName')]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "[concat('nic-', variables('vmHostname'), '-nic0-config')]",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), concat('sn-', variables('vnetName'), '-vm-', resourceGroup().location))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },                
+        {
+            "name": "[concat(variables('vmHostname'), '-001')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2019-07-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', concat('nic-', variables('vmHostname'), '-nic0'))]",
+                "[variables('vnetName')]"
+            ],
+            "tags": {
+                "displayName": "[concat(variables('vmHostname'), '-001')]"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('compute').vmSku]"
+                },
+                "osProfile": {
+                    "computerName": "[concat(variables('vmHostname'), '-001')]",
+                    "adminUsername": "[parameters('vmAdminUsername')]",
+                    "adminPassword": "[parameters('vmAdminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[parameters('compute').osImagePublisher]",
+                        "offer": "[parameters('compute').osImageOffer]",
+                        "sku": "[parameters('compute').osImageSku]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "[concat(variables('vmHostname'), '-001-osdisk')]",
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    },
+                    "copy": [
+                            {
+                            "name": "dataDisks",
+                            "count": 8,
+                            "input": {
+                                "name": "[concat(variables('vmHostname'), '-data-', copyIndex('DataDisks'))]",
+                                "diskSizeGB": 2048,
+                                "lun": "[copyIndex('DataDisks')]",
+                                "createOption": "Empty",
+                                "writeAcceleratorEnabled": false
+                            }
+                        }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat('nic-', variables('vmHostname'), '-nic0'))]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "[concat(variables('vmHostname'), '-001','/',variables('installscripts')[copyIndex()].name)]",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2019-07-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[variables('installscripts')[copyIndex()].name]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', concat(variables('vmHostname'), '-001'))]"
+            ],
+            "copy": {
+                "name": "customScriptLoop",
+                "count": "[length(variables('installscripts'))]"
+            },
+            "properties": {
+                "publisher": "Microsoft.Azure.Extensions",
+                "type": "CustomScript",
+                "typeHandlerVersion": "2.1",
+                "autoUpgradeMinorVersion": true,
+                "protectedSettings": {
+                    "fileUris": [
+                        "[variables('installscripts')[copyIndex()].uri]"
+                    ],                    
+                    "commandToExecute": "[concat('sh ', variables('installscripts')[copyIndex()].script)]"
+                }
+            }
         }        
     ],
     "outputs": {}
