@@ -28,6 +28,8 @@ jobs:
 
     - name: Deploy Template
       run: |
-        az deployment group create --resource-group anftest-env --template-file $GITHUB_WORKSPACE\anf-test-net.azrm.json
+        az deployment group create \
+          --resource-group anftest-env \
+          --template-file ./anf-test-net.azrm.json
         
 
