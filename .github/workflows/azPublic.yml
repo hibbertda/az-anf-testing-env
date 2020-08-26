@@ -29,4 +29,5 @@ jobs:
     - name: create resource group
       uses: azure/powershell@v1
       with:
-        run: .\scripts\deploy-template.ps1
+        inlineScript: |
+          .\scripts\deploy-template.ps1
