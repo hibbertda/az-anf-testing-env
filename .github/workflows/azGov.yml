@@ -24,7 +24,7 @@ jobs:
           az cloud set --name AzureUSGovernment
 
     - name: Azure Login
-      uses: Azure/login@v1.1
+      uses: Azure/login@v1
       with:
         creds: ${{secrets.AZGOVSP}}
         enable-AzPSSession: true
