@@ -25,7 +25,9 @@ jobs:
     - name: Create Resource Group
       run: |
         az group create --name anftest-env --location centralus
-        
-        az deployment group create --resource-group anftest-env --template-file .\anf-test-net.azrm.json
+
+    - name: Deploy Template
+      run: |
+        az deployment group create --resource-group anftest-env --template-file $GITHUB_WORKSPACE\anf-test-net.azrm.json
         
 
