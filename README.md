@@ -20,7 +20,7 @@ Use the following links to jump into deployed in your Azure environment.
 ---
 <br />
 
-## Environemt
+## Environment
 
 The template will deploy all required resources to create a new stand alone environment for testing. 
 
