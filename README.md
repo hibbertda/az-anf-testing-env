@@ -25,9 +25,11 @@ Use the following links to jump into deployed in your Azure environment.
 The template will deploy all required resources to create a new stand alone environment for testing. 
 
 The VM is not accessible directly from the internet. Azure Bastion is used to connect to the VM over SSH from the Azure portal.
+<center>
 
 ![environment layou](/static/envlayout.png)
 
+</center>
 ---
 <br />
 
@@ -44,7 +46,11 @@ The purpose of this template is to create an environemtn to test Azure NetApp Fi
 
 <br />
 
+<center>
+
 ![storage layout](/static/storagelayout.png)
+
+</center>
 
 <br />
 ---
