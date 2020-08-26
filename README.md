@@ -1,7 +1,11 @@
 # Azure NetApp Files (ANF) - Testing Environment
 Template to build testing environment for Azure NetApp Files (ANF). A virtual machine and all required infrastructure needed to test storage performance. Common storage performance tools are loaded on the Ubuntu VM.
 
-Use the following links to jump into deployed in your Azure environment.
+![Azure Public](https://github.com/hibbertda/az-anf-testing-env/workflows/Azure%20Public/badge.svg)
+![Azure Government](https://github.com/hibbertda/az-anf-testing-env/workflows/Azure%20Government/badge.svg)
+
+
+Use the following links to jump into deployment in your Azure environment.
 
 <br />
 
