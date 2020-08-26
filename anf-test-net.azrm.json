@@ -37,7 +37,7 @@
             "metadata": {
                 "description": "username for vm admin account"
             },
-            "defaultValue": "afntestadmin"
+            "defaultValue": "anftestadmin"
         },
         "vmAdminPassword": {
             "type": "securestring",
@@ -397,6 +397,11 @@
         "vm-ipaddress": {
             "type": "string",
             "value": "[reference(concat('nic-', variables('vmHostname'), '-nic0')).ipConfigurations[0].properties.privateIPAddress]"
+        },
+        "private-ssh": {
+            "type": "string",
+            "value": "[concat(reference(resourceId('Microsoft.Compute/virtualMachines',concat(variables('vmHostname'), '-001'))).osProfile.adminUsername, 
+                '@', reference(concat('nic-', variables('vmHostname'), '-nic0')).ipConfigurations[0].properties.privateIPAddress)]"
         }
     }
 }
