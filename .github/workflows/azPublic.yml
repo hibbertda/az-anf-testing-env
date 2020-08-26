@@ -30,6 +30,7 @@ jobs:
       run: |
         az deployment group create \
           --resource-group anftest-env \
-          --template-file ./anf-test-net.azrm.json
+          --template-file ./anf-test-net.azrm.json \
+          --parameters vmAdminPassword=${{secrets.AZVMPASS}}
         
 
