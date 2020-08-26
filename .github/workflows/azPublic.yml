@@ -12,8 +12,7 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     # The type of runner that the job will run on
-    # runs-on: ubuntu-latest
-    runs-on: windows-2019
+    runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -26,10 +25,9 @@ jobs:
         creds: ${{secrets.AZPUBLICSP}}
         enable-AzPSSession: true
         
-    - name: create resource group
-      uses: azure/powershell@v1
-      with:
-        inlineScript: |
-          $rgName = "anftest-"(get-date -format MMddyyyymm)
-          
-          new-azResourceGroup -name $rgName -location centralus
+        
+    - name: Create Resource Group
+      run: |
+        az group create --name anftest-env --location centralus
+        
+
