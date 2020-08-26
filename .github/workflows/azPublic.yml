@@ -30,4 +30,6 @@ jobs:
       uses: azure/powershell@v1
       with:
         inlineScript: |
-          .\scripts\deploy-template.ps1
+          $rgName = "anftest-"(get-date -format MMddyyyymm)
+          
+          new-azResourceGroup -name $rgName -location centralus
