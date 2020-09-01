@@ -366,7 +366,7 @@
         {
             "name": "[concat(variables('vmHostname'), '-001','/',variables('installscripts')[copyIndex()].name)]",
             "type": "Microsoft.Compute/virtualMachines/extensions",
-            "apiVersion": "2019-07-01",
+            "apiVersion": "2020-03-01",
             "location": "[resourceGroup().location]",
             "tags": {
                 "displayName": "[variables('installscripts')[copyIndex()].name]"
@@ -400,8 +400,7 @@
         },
         "private-ssh": {
             "type": "string",
-            "value": "[concat(reference(resourceId('Microsoft.Compute/virtualMachines',concat(variables('vmHostname'), '-001'))).osProfile.adminUsername, 
-                '@', reference(concat('nic-', variables('vmHostname'), '-nic0')).ipConfigurations[0].properties.privateIPAddress)]"
+            "value": "[concat(reference(resourceId('Microsoft.Compute/virtualMachines',concat(variables('vmHostname'), '-001'))).osProfile.adminUsername, '@', reference(concat('nic-', variables('vmHostname'), '-nic0')).ipConfigurations[0].properties.privateIPAddress)]"
         }
     }
 }
